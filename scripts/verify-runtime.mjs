@@ -17,10 +17,12 @@ child.stdout.on('data',chunk=>{log+=chunk;});child.stderr.on('data',chunk=>{log+
 let exit;
 child.on('exit',code=>exit=code);
 try{
-  let ready=false;
+  let ready=false,stableReads=0;
   for(let i=0;i<60;i++){
     if(exit!==undefined)throw Error('Local Worker stopped: '+log);
-    try{const r=await fetch('http://127.0.0.1:5179/api/team');if(r.status===401){ready=true;break;}}catch{}
+    // Wrangler may expose the port before its initial worker reload completes.
+    // Probe only safe reads until the JSON API is stable; never retry mutations.
+    try{const r=await fetch('http://127.0.0.1:5179/api/team');const body=await r.json();stableReads=r.status===401&&typeof body.error==='string'?stableReads+1:0;if(stableReads>=4){ready=true;break;}}catch{stableReads=0;}
     await delay(500);
   }
   if(!ready)throw Error('Local Worker did not start: '+log);
