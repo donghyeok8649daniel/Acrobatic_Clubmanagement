@@ -1,0 +1,20 @@
+export type Role = 'captain' | 'manager' | 'assistant' | 'player';
+export type Member = {id:string;name:string;role:Role;number:number|null;position:string;secondaryPosition?:string;positionNote?:string;status:string;note?:string;departureMonth?:string};
+export type Event = {id:string;title:string;date:string;time:string;endTime?:string;location:string;kind:string;note:string;attendance:Record<string,string>;recurrenceId?:string;opponent?:string;entryIds?:string[];best4?:Record<string,string>};
+export type Notice = {id:string;title:string;body:string;pinned:boolean;date:string;author:string};
+export type Transaction = {id:string;title:string;amount:number;date:string;kind:string;member:string};
+export type Match = {id:string;opponent:string;date:string;our:number;their:number;note:string};
+export type Task = {id:string;title:string;assignee:string;done:boolean};
+export type Equipment = {id:string;name:string;quantity:number;condition:string;holder:string};
+export type WeeklyTraining={id:string;weekday:number;time:string;endTime:string;location:string;startDate:string;note:string;enabled:boolean;exceptions?:string[]};
+export type TrainingSession={id:string;title:string;date:string;eventId?:string;goal:string;drills:string;feedback:string;author:string};
+export type Video={id:string;sessionId:string;title:string;fileName:string;size:number;type:string;uploadedBy:string;date:string};
+export type Operations={stage:string;officerStatus:'미정'|'확정';candidateIds:string[];financeOwnerId:string;equipmentOwnerId:string;seasonGoal:string;trainingExpansion:string};
+export type TeamState = {name:string;description:string;monthlyFee:number|null;members:Member[];events:Event[];notices:Notice[];transactions:Transaction[];matches:Match[];tasks:Task[];equipment:Equipment[];lineup:Record<string,string>;operations?:Operations;weeklyTraining?:WeeklyTraining[];trainingSessions?:TrainingSession[];videos?:Video[]};
+export const roleNames:Record<Role,string>={captain:'동장 · 주장',manager:'매니저',assistant:'선수 · 매니저',player:'선수'};
+export function koreaDate(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
+export function dateOffset(n:number){const d=new Date(koreaDate()+'T12:00:00+09:00');d.setDate(d.getDate()+n);return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);}
+export function initialState(name='아크로바틱',captain='나',demo=false):TeamState{
+ const members:Member[]=Array.from({length:16},(_,i)=>({id:'m'+(i+1),name:i===0?(demo?'동장 예시':captain):i===1?'매니저':i===2?'선수 매니저':'선수 '+(i-2),role:i===0?'captain':i===1?'manager':i===2?'assistant':'player',number:null,position:i===1?'운영':'미정',status:'활동 중'}));
+ return {name,description:'카이스트 족구동아리 · 함께 뛰고, 함께 성장하는 팀',monthlyFee:null,members,events:[],notices:[],transactions:[],matches:[],tasks:[],equipment:[],lineup:{},operations:{stage:'가동아리 · 첫 학기',officerStatus:'미정',candidateIds:['m1','m2','m3'],financeOwnerId:'m1',equipmentOwnerId:'m1',seasonGoal:'2027년 봄 대회 참여 검토 · 대회 및 경기 미확정',trainingExpansion:'훈련 참여율과 멤버 수가 늘어나면 훈련 확대 검토'},weeklyTraining:[],trainingSessions:[],videos:[]};
+}

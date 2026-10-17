@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+const url='http://127.0.0.1:5173/api/team';
+async function post(action,payload={},cookie='') {const response=await fetch(url,{method:'POST',headers:{'content-type':'application/json',origin:'http://127.0.0.1:5173',...(cookie?{cookie}:{})},body:JSON.stringify({action,payload})});return {status:response.status,data:await response.json(),cookie:response.headers.get('set-cookie')?.split(';')[0]};}
+const c=await post('create',{name:'검증 전용 테스트 팀',captain:'테스트 동장'});
+assert.equal(c.status,200,JSON.stringify(c.data));assert.equal(c.data.state.members.length,16);assert.equal(c.data.state.events.length,0);assert.equal(c.data.codes.length,16);
+const captain=c.cookie,teamId=c.data.teamId;
+let r=await post('event',{title:'공동 저장 검증 훈련',date:'2026-10-17',time:'15:00',location:'테스트 코트',kind:'정기 훈련',note:''},captain);assert.equal(r.status,200,JSON.stringify(r.data));const event=r.data.state.events[0].id;
+const player=await post('login',{teamId,code:c.data.codes.find(x=>x.memberId==='m4').code});assert.equal(player.status,200);assert.equal(player.data.state.events[0].title,'공동 저장 검증 훈련');
+r=await post('notice',{title:'권한 검증',body:'선수는 생성 불가'},player.cookie);assert.equal(r.status,400);assert.match(r.data.error,/관리 담당자/);
+r=await post('attendance',{event,member:'m5',value:'참석'},player.cookie);assert.equal(r.status,400);assert.match(r.data.error,/본인/);
+r=await post('attendance',{event,value:'참석'},player.cookie);assert.equal(r.status,200);assert.equal(r.data.state.events[0].attendance.m4,'참석');
+const manager=await post('login',{teamId,code:c.data.codes.find(x=>x.memberId==='m2').code});assert.equal(manager.status,200);
+r=await post('transaction',{title:'회비 검증',amount:20000,date:'2026-10-16',kind:'회비',member:'m4'},manager.cookie);assert.equal(r.status,200);
+r=await post('settings',{name:'권한 검사',monthlyFee:0},manager.cookie);assert.equal(r.status,400);
+await Promise.all(Array.from({length:3},(_,i)=>post('task',{title:'동시 저장 '+i,assignee:'m1'},captain))).then(rs=>rs.forEach(r=>assert.equal(r.status,200)));
+const read=await fetch(url,{headers:{cookie:captain}});const latest=await read.json();assert.equal(latest.state.tasks.length,3);assert.equal(latest.state.events[0].attendance.m4,'참석');assert.equal(latest.state.transactions[0].amount,20000);
+r=await post('event',{...latest.state.events[0],title:'수정된 훈련'},captain);assert.equal(r.status,200);assert.equal(r.data.state.events.length,1);assert.equal(r.data.state.events[0].attendance.m4,'참석');assert.equal(r.data.state.events[0].title,'수정된 훈련');
+const reset=await post('invite',{member:'m4'},captain);assert.equal(reset.status,200);
+const old=await fetch(url,{headers:{cookie:player.cookie}});assert.equal(old.status,401);
+r=await post('login',{teamId,code:c.data.codes.find(x=>x.memberId==='m4').code});assert.equal(r.status,401);
+r=await post('login',{teamId,code:reset.data.code});assert.equal(r.status,200);
+const anonymous=await fetch(url);assert.equal(anonymous.status,401);
+const cross=await fetch(url,{method:'POST',headers:{'content-type':'application/json',origin:'https://untrusted.test'},body:JSON.stringify({action:'task'})});assert.equal(cross.status,403);
+console.log('PASS: 16명 빈 팀 생성, 기기 간 공동 저장, 선수/매니저/동장 권한, 본인 출석, 회비, 동시 수정 보존, 코드 재발급·세션 만료, 익명·외부 요청 차단');

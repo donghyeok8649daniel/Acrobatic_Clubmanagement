@@ -1,0 +1,17 @@
+{
+  "id": "/",
+  "name": "KAIST 아크로바틱 · 코트인",
+  "short_name": "아크로바틱",
+  "description": "카이스트 족구동아리 아크로바틱의 팀 공간",
+  "lang": "ko-KR",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6f8f7",
+  "theme_color": "#152a2e",
+  "icons": [
+    { "src": "/icons/app-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/app-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

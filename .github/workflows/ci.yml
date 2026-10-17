@@ -1,0 +1,29 @@
+name: App checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm run install:ci
+      - run: npm run typecheck
+      - run: npm run test:unit
+      - run: npm run build
+      - run: npm run test:integration
+      - uses: actions/upload-artifact@v4
+        with:
+          name: acrobatic-worker-build
+          path: dist/
+          include-hidden-files: true
+          retention-days: 7
