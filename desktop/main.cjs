@@ -3,6 +3,8 @@ const { app, BrowserWindow, Menu, shell, session } = require('electron');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { APP_URL, isAppUrl } = require('./navigation.cjs');
+const { consumeFirstLogin } = require('./first-login.cjs');
+const fs = require('node:fs');
 const offlineFile = path.join(__dirname, 'offline.html');
 const offlineUrl = pathToFileURL(offlineFile).href;
 const singleInstance = app.requestSingleInstanceLock();
@@ -17,7 +19,12 @@ else {
     if (window.isMinimized()) window.restore();
     window.show(); window.focus();
   });
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
+    const profile=app.getPath('userData');
+    try {
+      const result=await consumeFirstLogin(path.join(profile,'first-login.json'),session.defaultSession);
+      if(result)fs.writeFileSync(path.join(profile,'first-login-result.json'),JSON.stringify(result));
+    } catch { console.error('Personal entry could not be connected. Please use the team login screen.'); }
     // Remote team pages have no Node.js, preload bridge, or device permissions.
     session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
     session.defaultSession.setPermissionCheckHandler(() => false);
