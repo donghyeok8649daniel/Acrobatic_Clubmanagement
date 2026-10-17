@@ -17,9 +17,10 @@ run(['scripts/run-framework.mjs','build']);
 const built = JSON.parse(fs.readFileSync(path.join(root,'dist/server/wrangler.json'),'utf8'));
 if (built.name !== config.workerName || built.account_id !== config.accountId
   || built.d1_databases?.find(item => item.binding === 'DB')?.database_id !== config.databaseId
-  || built.r2_buckets?.find(item => item.binding === 'BUCKET')?.bucket_name !== config.bucketName) {
+  || built.r2_buckets?.find(item => item.binding === 'BUCKET')?.bucket_name !== (config.videoStorageEnabled === false ? undefined : config.bucketName)) {
   throw Error('빌드 결과의 Cloudflare 계정·DB·영상 저장소가 배포 설정과 다릅니다. 원격 작업을 중단합니다.');
 }
+if(config.videoStorageEnabled === false) console.warn('영상 저장소 미연결: 공동 팀 기록은 사용할 수 있지만 영상 업로드는 저장소 연결 후 사용할 수 있습니다.');
 const migrations=path.join(root,'.sites-runtime','cloudflare-migrations.json');
 fs.writeFileSync(migrations,JSON.stringify({
   ...cloudflareBindings(config),

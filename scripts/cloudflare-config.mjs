@@ -20,6 +20,6 @@ export function cloudflareBindings(config) {
     workers_dev: true,
     preview_urls: false,
     d1_databases: [{ binding: 'DB', database_name: config.databaseName, database_id: config.databaseId }],
-    r2_buckets: [{ binding: 'BUCKET', bucket_name: config.bucketName }],
+    r2_buckets: config.videoStorageEnabled === false ? [] : [{ binding: 'BUCKET', bucket_name: config.bucketName }],
   };
 }

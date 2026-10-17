@@ -34,6 +34,8 @@ npm exec --yes --package=wrangler@4.151.1 -- wrangler login --device --browser=f
 
 ## 배포·업데이트
 
+R2 활성화 전 공동 기록 앱부터 운영하려면 위 설정에 `"videoStorageEnabled": false`를 명시합니다. 이 경우 영상 업로드는 저장소 연결 안내를 반환합니다. R2 버킷을 만든 뒤 이 항목을 제거하거나 `true`로 바꾸고 다시 배포하면 영상 기능이 연결됩니다.
+
 ```sh
 npm run deploy:cloudflare
 ```
