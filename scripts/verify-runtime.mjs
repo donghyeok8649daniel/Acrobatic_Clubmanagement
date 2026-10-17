@@ -24,6 +24,12 @@ try{
     await delay(500);
   }
   if(!ready)throw Error('Local Worker did not start: '+log);
+  // Cloudflare redirects /offline.html to /offline. Cache the canonical URL:
+  // a redirected cached response cannot serve a navigation with redirect=manual.
+  const offline=await fetch('http://127.0.0.1:5179/offline');
+  if(offline.status!==200||offline.redirected||!(await offline.text()).includes('잠시 연결이 끊겼어요'))throw Error('Offline fallback must be a direct HTML response.');
+  const manifest=await fetch('http://127.0.0.1:5179/manifest.webmanifest');
+  if(manifest.status!==200||(await manifest.json()).display!=='standalone')throw Error('Install manifest unavailable.');
   const result=spawnSync(process.execPath,['scripts/verify-oct18.mjs'],{stdio:'inherit',env:{...env,ACRO_ORIGIN:'http://127.0.0.1:5179'}});
   if(result.status!==0)process.exitCode=result.status||1;
 }catch(error){console.error(error);process.exitCode=1;}
