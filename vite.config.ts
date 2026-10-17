@@ -4,6 +4,7 @@ import hostingConfig from "./.openai/hosting.json";
 import { readExecutionProfile } from "./scripts/execution-profile.mjs";
 import { sites } from "./build/sites-vite-plugin";
 import { connectorPreview } from "./build/connector-preview-plugin.mjs";
+import { readCloudflareDeployment, cloudflareBindings } from "./scripts/cloudflare-config.mjs";
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
@@ -13,6 +14,8 @@ const { d1, r2 } = hostingConfig;
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 const managedLinux = readExecutionProfile() === "managed-linux";
+const standaloneDeployment = process.env.ACRO_DEPLOY_TARGET === "cloudflare"
+  ? cloudflareBindings(readCloudflareDeployment()) : null;
 
 const localBindingConfig = {
   main: "./build/sites-worker.ts",
@@ -69,6 +72,7 @@ export default defineConfig(async ({ command }) => {
         inspectorPort: false,
         config: {
           ...localBindingConfig,
+          ...(standaloneDeployment || {}),
           ...(command === "serve"
             ? {
                 services: [

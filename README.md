@@ -47,7 +47,7 @@ React·Vinext·Vite와 Cloudflare Workers 런타임을 사용합니다. D1의 `D
 
 기존 Sites 프로젝트 식별자는 `.openai/hosting.json`에 유지되어 있습니다. 기존 사이트 소유자·편집자 권한이 연결된 환경에서 Sites 소스 동기화 → 빌드 → 버전 저장 → 배포 순서로 업데이트하세요. 기존 사이트의 데이터·주소·공개 범위를 유지합니다. GitHub CI는 검증과 빌드 결과 생성만 수행하며 자동으로 사이트를 배포하지 않습니다.
 
-직접 Cloudflare로 운영하려면 본인 계정의 실제 D1 데이터베이스·R2 버킷 바인딩과 Worker 이름을 `vite.config.ts`에 설정하고 빌드해야 합니다. 현재 데이터베이스 ID는 로컬 개발용 자리표시자이므로 이 값으로 직접 원격 배포하지 마세요. 기존 Sites 배포에서는 플랫폼이 실제 저장소 바인딩을 연결합니다. 계정 토큰은 GitHub Secrets 등 인증 저장소에만 보관하세요.
+직접 Cloudflare로 운영하는 절차는 [Cloudflare 배포 안내](DEPLOY-CLOUDFLARE.md)를 따르세요. 실제 D1·R2 리소스 정보를 Git에서 제외된 `.sites-runtime/cloudflare.json`에 설정한 뒤 `npm run deploy:cloudflare`를 실행합니다. 배포 스크립트가 실제 바인딩을 검증하고 빌드·DB 마이그레이션·Worker 배포를 수행합니다. 계정 토큰이나 비밀번호를 소스에 넣지 마세요.
 
 ## 검증
 
