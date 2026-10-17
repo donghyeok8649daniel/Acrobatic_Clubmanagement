@@ -1,6 +1,8 @@
 # KAIST 아크로바틱 · 코트인
 
-카이스트 족구동아리 아크로바틱을 위한 팀 관리 웹 앱입니다. 팀 ID와 개인 입장코드로 팀원들이 기록을 공유합니다. PC와 휴대폰에 설치할 수 있는 PWA이며, 별도의 EXE·APK·App Store 패키지는 포함하지 않습니다.
+카이스트 족구동아리 아크로바틱을 위한 팀 관리 앱입니다. 팀 ID와 개인 입장코드로 팀원들이 기록을 공유합니다. [온라인 앱](https://acrobatic-clubmanagement.acrobatic-kaist.workers.dev/)을 사용하거나 Windows EXE·PC 및 휴대폰 PWA로 설치할 수 있습니다.
+
+**Windows 다운로드:** [최신 GitHub Release](https://github.com/donghyeok8649daniel/Acrobatic_Clubmanagement/releases/latest)에서 `Acrobatic-Setup-…-x64.exe`를 받아 실행하세요. 현재 Windows 사용자 계정에 설치하고 바탕화면·시작 메뉴에 ‘아크로바틱’을 추가합니다. Windows 10/11 64비트를 지원하며 인터넷 연결이 필요합니다. PC 앱도 같은 온라인 서버의 팀 기록을 사용합니다.
 
 ## 기능
 
@@ -30,6 +32,8 @@ npm run dev
 기본 개발 주소는 `http://127.0.0.1:5173`입니다. 실제 주소는 터미널을 확인하세요. 로컬 DB는 컴퓨터 안에만 존재하며, 여러 기기에서 기록을 공유하려면 온라인 배포가 필요합니다.
 
 ## PC·모바일 설치
+
+Windows 설치 파일의 소스와 빌드 방법은 [desktop 안내](desktop/README.md)에 있습니다. 설치 파일 없이 사용하려면 아래 PWA 방식도 지원합니다.
 
 HTTPS로 배포된 앱을 열고 사이드바의 `앱 설치`를 누르세요.
 

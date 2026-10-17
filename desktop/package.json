@@ -1,0 +1,43 @@
+{
+  "name": "acrobatic-desktop",
+  "version": "0.1.0",
+  "description": "KAIST 아크로바틱 팀 관리 Windows 앱",
+  "author": "Acrobatic Club",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.cjs",
+    "build:win": "electron-builder --win nsis --x64 --publish never",
+    "build:dir": "electron-builder --win --x64 --dir --publish never"
+  },
+  "devDependencies": {
+    "electron": "44.9.0",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "kr.acrobatic.courtin",
+    "productName": "아크로바틱",
+    "executableName": "Acrobatic",
+    "asar": true,
+    "directories": { "output": "release", "buildResources": "assets" },
+    "files": ["main.cjs", "navigation.cjs", "offline.html", "assets/icon.png", "package.json"],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "assets/icon.ico",
+      "artifactName": "Acrobatic-Setup-${version}-${arch}.${ext}",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "packElevateHelper": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "아크로바틱",
+      "uninstallDisplayName": "아크로바틱",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true
+    }
+  }
+}
