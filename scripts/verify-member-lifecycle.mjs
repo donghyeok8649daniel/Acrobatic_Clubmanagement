@@ -54,3 +54,37 @@ current=await edit('m3',{status:'귀국'});assert.deepEqual(current.positionLead
 assert.equal((await post('positionLeader',{group:'setter',member:'m3'},captain)).status,400);
 current=await edit('m3',{status:'활동 중'});assert.deepEqual(current.positionLeaders,{defense:'m4'});
 console.log('PASS: primary/secondary position removal, role changes and live session permissions, rejected membership removal, return/reactivation leadership lifecycle');
+
+// Role/status changes must also remove ineligible players from upcoming match
+// selections, while preserving past match history and attendance records.
+const fixtures=[];
+for(const date of ['2000-11-02','2099-11-02']){
+ result=await post('event',{title:'엔트리 변경 검증',kind:'친선 경기',date,time:'18:30',location:'테스트 코트'},captain);
+ assert.equal(result.status,200);const event=result.data.state.events.find(v=>v.date===date).id;fixtures.push(event);
+ for(const member of ['m3','m4']){
+  assert.equal((await post('attendance',{event,member,value:'참석'},captain)).status,200);
+  assert.equal((await post('matchEntry',{event,member},captain)).status,200);
+ }
+ for(const [slot,member] of [['setter','m3'],['left','m4']])assert.equal((await post('matchBest4',{event,slot,member},captain)).status,200);
+}
+assert.equal((await post('lineup',{slot:'setter',member:'m3'},captain)).status,200);
+await assign('setter','m3');
+const roleChange=await state();roleChange.members.find(v=>v.id==='m3').role='manager';
+result=await post('setup',roleChange,captain);assert.equal(result.status,200);current=result.data.state;
+const past=current.events.find(v=>v.id===fixtures[0]);
+let upcoming=current.events.find(v=>v.id===fixtures[1]);
+assert.deepEqual(past.entryIds,['m3','m4']);assert.equal(past.best4.setter,'m3');
+assert.deepEqual(upcoming.entryIds,['m4']);assert.deepEqual(upcoming.best4,{left:'m4'});
+assert.equal(upcoming.attendance.m3,'참석');assert.equal(current.lineup.setter,undefined);assert.equal(current.positionLeaders.setter,undefined);
+assert.equal((await post('matchEntry',{event:fixtures[1],member:'m3'},captain)).status,400);
+assert.equal((await post('matchBest4',{event:fixtures[0],slot:'attack',member:'m3'},captain)).status,400);
+assert.equal((await post('lineup',{slot:'attack',member:'m3'},captain)).status,400);
+current=await edit('m4',{status:'귀국'});upcoming=current.events.find(v=>v.id===fixtures[1]);
+assert.deepEqual(upcoming.entryIds,[]);assert.deepEqual(upcoming.best4,{});
+assert.deepEqual(current.events.find(v=>v.id===fixtures[0]),past);
+assert.equal((await post('matchEntry',{event:fixtures[1],member:'m4'},captain)).status,400);
+assert.equal((await post('lineup',{slot:'left',member:'m4'},captain)).status,400);
+current=await edit('m4',{status:'활동 중'});
+assert.deepEqual(current.events.find(v=>v.id===fixtures[1]).entryIds,[]);
+assert.deepEqual(current.events.find(v=>v.id===fixtures[1]).best4,{});
+console.log('PASS: role/return changes clear future match rosters, BEST 4 and current lineup; past matches and attendance are preserved; reactivation never auto-selects players');

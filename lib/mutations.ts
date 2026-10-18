@@ -1,6 +1,7 @@
 import {TeamState,Member,Operations,WeeklyTraining,koreaDate} from './domain';
 import {findEvent} from './training';
 import {canLeadPosition,cleanPositionLeaders,positionGroups} from './member-profile';
+import {isPlayingMember} from './positions';
 const text=(v:any,max=500)=>{if(typeof v!=='string'||!v.trim()||v.length>max)throw Error('입력 내용을 확인해주세요.');return v.trim();};
 const optional=(v:any,max=1000)=>typeof v==='string'?v.trim().slice(0,max):'';
 const validDate=(v:any)=>{const d=text(v,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(d)||!Number.isFinite(Date.parse(d))||new Date(d+'T12:00:00Z').toISOString().slice(0,10)!==d)throw Error('날짜를 확인해주세요.');return d;};
@@ -32,8 +33,8 @@ export function mutate(state:TeamState,memberId:string,type:string,p:any):TeamSt
  case 'attendance':{const e=event(p.event),m=member(p.member||memberId);if(!admin&&m!==memberId)throw Error('본인의 출석만 변경할 수 있습니다.');if(!['참석','불참','미정'].includes(p.value))throw Error('출석을 선택해주세요.');e.attendance[m]=p.value;if(p.value!=='참석'){e.entryIds=e.entryIds?.filter(x=>x!==m);for(const slot of Object.keys(e.best4||{}))if(e.best4![slot]===m)delete e.best4![slot];}break;}
  case 'event':{requireAdmin();const start=time(p.time),end=p.endTime?time(p.endTime):undefined;if(end&&end<=start)throw Error('종료 시간은 시작 시간 뒤여야 합니다.');if(p.id&&!s.events.some(e=>e.id===p.id))event(p.id);put('events',{id:id(),title:text(p.title,100),date:validDate(p.date),time:start,endTime:end,location:text(p.location,150),kind:text(p.kind,30),note:optional(p.note),opponent:optional(p.opponent,100),attendance:{}});break;}
  case 'weeklyTraining':requireCaptain();s.weeklyTraining=weekly(p.rules);break;
- case 'matchEntry':{requireAdmin();const e=event(p.event);if(!['친선 경기','대회'].includes(e.kind))throw Error('경기 일정에서만 엔트리를 편집할 수 있습니다.');const m=member(p.member);if(s.members.find(v=>v.id===m)?.role==='manager'||e.attendance[m]!=='참석')throw Error('참석하는 선수만 엔트리에 넣을 수 있습니다.');const entry=new Set(e.entryIds||[]);if(entry.has(m)){entry.delete(m);for(const slot of Object.keys(e.best4||{}))if(e.best4![slot]===m)delete e.best4![slot];}else entry.add(m);e.entryIds=[...entry];break;}
- case 'matchBest4':{requireAdmin();const e=event(p.event);if(!['친선 경기','대회'].includes(e.kind)||!['attack','setter','left','right'].includes(p.slot))throw Error('경기 포지션을 확인해주세요.');if(p.member&&(!e.entryIds?.includes(p.member)||e.attendance[p.member]!=='참석'))throw Error('참석 엔트리에 있는 선수를 선택해주세요.');e.best4??={};for(const slot of Object.keys(e.best4))if(e.best4[slot]===p.member)delete e.best4[slot];if(p.member)e.best4[p.slot]=p.member;else delete e.best4[p.slot];break;}
+ case 'matchEntry':{requireAdmin();const e=event(p.event);if(!['친선 경기','대회'].includes(e.kind))throw Error('경기 일정에서만 엔트리를 편집할 수 있습니다.');const m=member(p.member),entry=new Set(e.entryIds||[]);if(entry.has(m)){entry.delete(m);for(const slot of Object.keys(e.best4||{}))if(e.best4![slot]===m)delete e.best4![slot];}else{if(!isPlayingMember(s.members.find(v=>v.id===m))||e.attendance[m]!=='참석')throw Error('참석하는 선수만 엔트리에 넣을 수 있습니다.');entry.add(m);}e.entryIds=[...entry];break;}
+ case 'matchBest4':{requireAdmin();const e=event(p.event);if(!['친선 경기','대회'].includes(e.kind)||!['attack','setter','left','right'].includes(p.slot))throw Error('경기 포지션을 확인해주세요.');if(p.member&&(!isPlayingMember(s.members.find(v=>v.id===p.member))||!e.entryIds?.includes(p.member)||e.attendance[p.member]!=='참석'))throw Error('참석 엔트리에 있는 선수를 선택해주세요.');e.best4??={};for(const slot of Object.keys(e.best4))if(e.best4[slot]===p.member)delete e.best4[slot];if(p.member)e.best4[p.slot]=p.member;else delete e.best4[p.slot];break;}
  case 'notice':requireAdmin();put('notices',{id:id(),title:text(p.title,100),body:text(p.body,3000),pinned:!!p.pinned,date:koreaDate(),author:memberId});break;
  case 'transaction':requireAdmin();if(!Number.isSafeInteger(p.amount)||Math.abs(p.amount)>100000000||p.amount===0)throw Error('금액을 확인해주세요.');put('transactions',{id:id(),title:text(p.title,100),date:validDate(p.date),amount:p.amount,kind:text(p.kind,30),member:member(p.member,true)});break;
  case 'match':requireAdmin();if(![p.our,p.their].every(v=>Number.isInteger(v)&&v>=0&&v<=99)||p.our===p.their)throw Error('승패가 있는 세트 스코어를 입력해주세요.');put('matches',{id:id(),opponent:text(p.opponent,100),date:validDate(p.date),our:p.our,their:p.their,note:optional(p.note)});break;
@@ -42,10 +43,21 @@ export function mutate(state:TeamState,memberId:string,type:string,p:any):TeamSt
  case 'taskToggle':{const t=s.tasks.find(t=>t.id===p.id);if(!t)throw Error('할 일이 없습니다.');if(!admin&&t.assignee!==memberId)throw Error('담당자만 완료할 수 있습니다.');t.done=!t.done;break;}
  case 'equipment':requireAdmin();if(!Number.isInteger(p.quantity)||p.quantity<1||p.quantity>9999)throw Error('수량을 확인해주세요.');put('equipment',{id:id(),name:text(p.name,100),quantity:p.quantity,condition:text(p.condition,30),holder:member(p.holder)});break;
  case 'trainingSession':requireAdmin();if(p.eventId&&!findEvent(s,p.eventId))throw Error('연결할 일정이 없습니다.');put('trainingSessions',{id:id(),title:text(p.title,100),date:validDate(p.date),goal:optional(p.goal,1000),drills:optional(p.drills,3000),feedback:optional(p.feedback,3000),author:memberId,...(p.eventId?{eventId:p.eventId}:{})});break;
- case 'lineup':requireAdmin();if(!['attack','setter','left','right'].includes(p.slot))throw Error('포지션을 확인해주세요.');if(p.member&&s.members.find(m=>m.id===p.member)?.role==='manager')throw Error('선수를 선택해주세요.');if(p.member)member(p.member);for(const slot of Object.keys(s.lineup))if(s.lineup[slot]===p.member)delete s.lineup[slot];s.lineup[p.slot]=p.member;break;
+ case 'lineup':requireAdmin();if(!['attack','setter','left','right'].includes(p.slot))throw Error('포지션을 확인해주세요.');if(p.member&&!isPlayingMember(s.members.find(m=>m.id===p.member)))throw Error('선수를 선택해주세요.');if(p.member)member(p.member);for(const slot of Object.keys(s.lineup))if(s.lineup[slot]===p.member)delete s.lineup[slot];s.lineup[p.slot]=p.member;break;
  case 'settings':requireCaptain();s.name=text(p.name,40);s.description=optional(p.description,150);if(p.monthlyFee!==null&&(!Number.isSafeInteger(p.monthlyFee)||p.monthlyFee<0||p.monthlyFee>1000000))throw Error('회비를 확인해주세요.');s.monthlyFee=p.monthlyFee;break;
  case 'delete':{requireAdmin();if(!['events','notices','transactions','matches','tasks','equipment','trainingSessions'].includes(p.collection))throw Error('삭제할 수 없습니다.');if(p.collection==='events'){const e=findEvent(s,p.id);if(e?.recurrenceId){const r=s.weeklyTraining?.find(r=>r.id===e.recurrenceId);if(r)r.exceptions=[...new Set([...(r.exceptions||[]),e.date])];}}if(p.collection==='trainingSessions'&&s.videos?.some(v=>v.sessionId===p.id))throw Error('영상을 먼저 삭제한 뒤 세션을 삭제해주세요.');const key=p.collection as 'events';s[key]=(s[key]||[]).filter((e:any)=>e.id!==p.id) as any;break;}
  default:throw Error('지원하지 않는 작업입니다.');}
- if(type==='member')s.positionLeaders=cleanPositionLeaders(s.members,s.positionLeaders);
+ if(type==='member'||type==='setup'){
+  s.positionLeaders=cleanPositionLeaders(s.members,s.positionLeaders);
+  const players=new Set(s.members.filter(isPlayingMember).map(member=>member.id)),today=koreaDate();
+  for(const slot of Object.keys(s.lineup))if(s.lineup[slot]&&!players.has(s.lineup[slot]))delete s.lineup[slot];
+  for(const event of s.events){
+   // Past match selections are historical records. Only current/upcoming
+   // matches follow today's playing eligibility; attendance is kept intact.
+   if(event.date<today||!['친선 경기','대회'].includes(event.kind))continue;
+   if(event.entryIds)event.entryIds=event.entryIds.filter(id=>players.has(id)&&event.attendance[id]==='참석');
+   for(const slot of Object.keys(event.best4||{}))if(!event.entryIds?.includes(event.best4![slot]))delete event.best4![slot];
+  }
+ }
  if(JSON.stringify(s).length>750000)throw Error('팀 기록 용량을 초과했습니다. 오래된 기록을 내보내고 정리해주세요.');return s;
 }

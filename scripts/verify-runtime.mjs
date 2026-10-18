@@ -10,6 +10,9 @@ fs.mkdirSync(state,{recursive:true});
 const wrangler='node_modules/wrangler/bin/wrangler.js';
 const common=['--config','dist/server/wrangler.json','--local','--persist-to',state];
 const env={...process.env,WRANGLER_SEND_METRICS:'false',WRANGLER_WRITE_LOGS:'false',CLOUDFLARE_CF_FETCH_ENABLED:'false'};
+const allScripts=['scripts/verify-oct18.mjs','scripts/verify-members.mjs','scripts/verify-member-lifecycle.mjs'];
+const selectedScripts=process.argv.slice(2);
+if(selectedScripts.some(script=>!allScripts.includes(script)))throw Error('Unknown integration test script.');
 for(const migration of fs.readdirSync('drizzle').filter(v=>v.endsWith('.sql')).sort()){
  const schema=spawnSync(process.execPath,[wrangler,'d1','execute','DB',...common,'--file',path.join('drizzle',migration)],{stdio:'inherit',env});
  if(schema.status!==0)process.exit(schema.status||1);
@@ -42,7 +45,7 @@ try{
   const manifest=await fetch(origin+'/manifest.webmanifest');
   if(manifest.status!==200||(await manifest.json()).display!=='standalone')throw Error('Install manifest unavailable.');
   // Keep this event loop free to service the local runtime's bindings/proxy.
-  for(const script of ['scripts/verify-oct18.mjs','scripts/verify-members.mjs','scripts/verify-member-lifecycle.mjs']){
+  for(const script of selectedScripts.length?selectedScripts:allScripts){
    const result=await new Promise((resolve,reject)=>{const child=spawn(process.execPath,[script],{stdio:'inherit',env:{...env,ACRO_ORIGIN:origin}});child.once('error',reject);child.once('exit',code=>resolve(code));});
    if(result!==0){process.exitCode=result||1;break;}
   }
