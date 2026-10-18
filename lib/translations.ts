@@ -146,7 +146,7 @@ KAIST 가동아리 · 첫 학기|KAIST provisional club · First semester
 관리 담당자|Team administrators
 이름 또는 포지션 검색|Search name or position
 활동 중|Active
-월 프랑스 귀국 예정| — returning to France
+프랑스 귀국 예정|— returning to France
 미정|Undecided
 부 ·|Secondary ·
 프로필 보기|View profile
@@ -562,6 +562,11 @@ MP4, WebM, MOV 형식만 지원합니다.|Only MP4, WebM and MOV formats are sup
 JPEG 사진으로 변환해서 올려주세요.|Convert the photo to JPEG before uploading.
 `;
 export const english:Readonly<Record<string,string>>=Object.fromEntries(entries.trim().split('\n').map(row=>{const index=row.indexOf('|');return [row.slice(0,index),row.slice(index+1)];}));
+
+export function formatMonth(value:string,language:Language):string{
+ if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(value))return value;
+ return new Date(value+'-01T12:00:00Z').toLocaleDateString(language==='en'?'en-US':'ko-KR',{year:'numeric',month:'long',timeZone:'UTC'});
+}
 
 export function translate(text:string,language:Language):string{
  if(language==='ko'||!/[가-힣]/.test(text))return text;

@@ -42,7 +42,7 @@ try{
   const manifest=await fetch(origin+'/manifest.webmanifest');
   if(manifest.status!==200||(await manifest.json()).display!=='standalone')throw Error('Install manifest unavailable.');
   // Keep this event loop free to service the local runtime's bindings/proxy.
-  for(const script of ['scripts/verify-oct18.mjs','scripts/verify-members.mjs']){
+  for(const script of ['scripts/verify-oct18.mjs','scripts/verify-members.mjs','scripts/verify-member-lifecycle.mjs']){
    const result=await new Promise((resolve,reject)=>{const child=spawn(process.execPath,[script],{stdio:'inherit',env:{...env,ACRO_ORIGIN:origin}});child.once('error',reject);child.once('exit',code=>resolve(code));});
    if(result!==0){process.exitCode=result||1;break;}
   }
