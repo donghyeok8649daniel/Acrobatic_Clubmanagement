@@ -7,6 +7,7 @@
 ## 기능
 
 - 대시보드, 공지, 명단과 주·세컨 포지션, 역할별 관리 권한
+- 팀원별 프로필 사진 등록·변경·삭제, 공격수·세터·수비별 팀장 지정과 배지
 - 정기 훈련과 특정 날짜 휴훈, 일정별 참가 조사·출석
 - 훈련 세션과 목표·드릴·피드백, 비공개 영상 업로드와 재생
 - 경기 참가 조사 → 엔트리 → 공격수·세터·좌수비·우수비 BEST 4 배치
@@ -26,6 +27,7 @@ Node.js 24 LTS와 npm이 필요합니다. Windows에서는 `start-local.ps1`을 
 npm run install:ci
 npm run build
 node node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_solid_omega_sentinel.sql
+node node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0001_cloudy_nocturne.sql
 npm run dev
 ```
 
@@ -69,5 +71,9 @@ GitHub Actions에서도 같은 검사를 수행합니다. 빌드 결과는 `acro
 ## 운영
 
 팀원마다 별도의 입장코드를 전달하세요. 주장의 코드를 팀원에게 공유하지 마세요. 서버에는 코드의 해시를 저장하며 세션은 HttpOnly 쿠키를 사용합니다. 영상은 MP4·WebM·MOV, 파일당 최대 80 MB, 팀 전체 2 GB까지입니다. 영상 코덱 지원은 브라우저에 따라 다릅니다.
+
+프로필 사진은 브라우저에서 중앙을 정사각형으로 자르고 최대 512px·128KB JPEG로 압축하여 D1에 저장합니다. 별도 R2 활성화 없이 사용할 수 있으며 팀 로그인 뒤에만 표시됩니다. 본인 또는 관리 담당자가 등록·삭제할 수 있고, 팀 현황을 다시 가져와도 기존 사진은 유지됩니다. 사진 파일과 팀 기록의 사진 버전은 같은 DB 트랜잭션으로 갱신합니다.
+
+포지션 팀장은 동장만 지정합니다. 해당 주·세컨 포지션을 가진 선수 중에서 선택하며, 지정 자체가 추가 관리 권한을 주지는 않습니다. 포지션 변경이나 귀국으로 자격이 사라지면 해당 팀장 지정이 해제됩니다. 최초에는 모두 미정입니다.
 
 새 팀을 직접 생성하면 임시 명단으로 시작하며 예산·경기·장비 기록은 비어 있습니다. 이미 등록된 팀은 새로 만들지 말고 기존 팀 ID와 개인 입장코드로 로그인하세요. 실제 동아리의 개인 정보와 운영 현황은 로그인한 팀에만 가져오세요.

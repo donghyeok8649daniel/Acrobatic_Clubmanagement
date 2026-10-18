@@ -1,5 +1,6 @@
 export type Role = 'captain' | 'manager' | 'assistant' | 'player';
-export type Member = {id:string;name:string;role:Role;number:number|null;position:string;secondaryPosition?:string;positionNote?:string;status:string;note?:string;departureMonth?:string};
+export type Member = {id:string;name:string;role:Role;number:number|null;position:string;secondaryPosition?:string;positionNote?:string;status:string;note?:string;departureMonth?:string;photoRevision?:string};
+export type PositionGroup='attack'|'setter'|'defense';
 export type Event = {id:string;title:string;date:string;time:string;endTime?:string;location:string;kind:string;note:string;attendance:Record<string,string>;recurrenceId?:string;opponent?:string;entryIds?:string[];best4?:Record<string,string>};
 export type Notice = {id:string;title:string;body:string;pinned:boolean;date:string;author:string};
 export type Transaction = {id:string;title:string;amount:number;date:string;kind:string;member:string};
@@ -10,7 +11,7 @@ export type WeeklyTraining={id:string;weekday:number;time:string;endTime:string;
 export type TrainingSession={id:string;title:string;date:string;eventId?:string;goal:string;drills:string;feedback:string;author:string};
 export type Video={id:string;sessionId:string;title:string;fileName:string;size:number;type:string;uploadedBy:string;date:string};
 export type Operations={stage:string;officerStatus:'미정'|'확정';candidateIds:string[];financeOwnerId:string;equipmentOwnerId:string;seasonGoal:string;trainingExpansion:string};
-export type TeamState = {name:string;description:string;monthlyFee:number|null;members:Member[];events:Event[];notices:Notice[];transactions:Transaction[];matches:Match[];tasks:Task[];equipment:Equipment[];lineup:Record<string,string>;operations?:Operations;weeklyTraining?:WeeklyTraining[];trainingSessions?:TrainingSession[];videos?:Video[]};
+export type TeamState = {name:string;description:string;monthlyFee:number|null;members:Member[];events:Event[];notices:Notice[];transactions:Transaction[];matches:Match[];tasks:Task[];equipment:Equipment[];lineup:Record<string,string>;operations?:Operations;weeklyTraining?:WeeklyTraining[];trainingSessions?:TrainingSession[];videos?:Video[];positionLeaders?:Partial<Record<PositionGroup,string>>};
 export const roleNames:Record<Role,string>={captain:'동장 · 주장',manager:'매니저',assistant:'선수 · 매니저',player:'선수'};
 export function koreaDate(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
 export function dateOffset(n:number){const d=new Date(koreaDate()+'T12:00:00+09:00');d.setDate(d.getDate()+n);return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);}

@@ -1,5 +1,6 @@
 import {TeamState,Member,Operations,WeeklyTraining,koreaDate} from './domain';
 import {findEvent} from './training';
+import {canLeadPosition,cleanPositionLeaders,positionGroups} from './member-profile';
 const text=(v:any,max=500)=>{if(typeof v!=='string'||!v.trim()||v.length>max)throw Error('입력 내용을 확인해주세요.');return v.trim();};
 const optional=(v:any,max=1000)=>typeof v==='string'?v.trim().slice(0,max):'';
 const validDate=(v:any)=>{const d=text(v,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(d)||!Number.isFinite(Date.parse(d))||new Date(d+'T12:00:00Z').toISOString().slice(0,10)!==d)throw Error('날짜를 확인해주세요.');return d;};
@@ -16,7 +17,8 @@ export function validateSetup(p:any,current:TeamState,memberId:string):TeamState
  const operations:Operations={stage:text(op.stage,100),officerStatus:op.officerStatus,candidateIds:Array.isArray(op.candidateIds)?[...new Set<string>(op.candidateIds.map(member))]:[],financeOwnerId:member(op.financeOwnerId),equipmentOwnerId:member(op.equipmentOwnerId),seasonGoal:optional(op.seasonGoal,500),trainingExpansion:optional(op.trainingExpansion,500)};
  const fee=p.monthlyFee===null?null:p.monthlyFee;if(fee!==null&&(!Number.isSafeInteger(fee)||fee<0||fee>1000000))throw Error('회비를 확인해주세요.');
  const rules=weekly(p.weeklyTraining||[]).map(r=>({...r,exceptions:[...new Set([...(current.weeklyTraining?.find(old=>old.id===r.id)?.exceptions||[]),...(r.exceptions||[])])]}));
- return {...current,name:text(p.name,40),description:optional(p.description,150),members,monthlyFee:fee,operations,weeklyTraining:rules};
+ for(const member of members){const old=current.members.find(v=>v.id===member.id);if(old?.photoRevision)member.photoRevision=old.photoRevision;}
+ return {...current,name:text(p.name,40),description:optional(p.description,150),members,monthlyFee:fee,operations,weeklyTraining:rules,positionLeaders:cleanPositionLeaders(members,current.positionLeaders)};
 }
 export function mutate(state:TeamState,memberId:string,type:string,p:any):TeamState{
  let s=structuredClone(state);const me=s.members.find(m=>m.id===memberId);if(!me)throw Error('팀원을 찾을 수 없습니다.');const admin=me.role!=='player',captain=me.role==='captain';
@@ -25,6 +27,7 @@ export function mutate(state:TeamState,memberId:string,type:string,p:any):TeamSt
  const event=(eid:string)=>{const e=findEvent(s,eid);if(!e)throw Error('일정이 없습니다.');if(!s.events.some(v=>v.id===eid))s.events.push(e);return s.events.find(v=>v.id===eid)!;};
  const put=(key:'events'|'notices'|'transactions'|'matches'|'tasks'|'equipment'|'trainingSessions',item:any)=>{if(key==='trainingSessions')s.trainingSessions??=[];const list=s[key] as any[];if(p.id){const i=list.findIndex(v=>v.id===p.id);if(i<0)throw Error('수정할 기록이 없습니다.');const old=list[i];list[i]={...old,...item,id:p.id,...(key==='events'?{attendance:old.attendance}:{}),...(key==='tasks'?{done:old.done}:{})};}else if(['notices','matches','tasks','trainingSessions'].includes(key))list.unshift(item);else list.push(item);};
  switch(type){
+ case 'positionLeader':{requireCaptain();const group=positionGroups.find(v=>v.id===p.group);if(!group)throw Error('포지션을 확인해주세요.');s.positionLeaders??={};if(!p.member){delete s.positionLeaders[group.id];break;}const leader=s.members.find(v=>v.id===p.member);if(!leader||!canLeadPosition(leader,group.id))throw Error('해당 주·세컨 포지션을 가진 선수를 선택해주세요.');s.positionLeaders[group.id]=leader.id;break;}
  case 'setup':requireCaptain();s=validateSetup(p,s,memberId);break;
  case 'attendance':{const e=event(p.event),m=member(p.member||memberId);if(!admin&&m!==memberId)throw Error('본인의 출석만 변경할 수 있습니다.');if(!['참석','불참','미정'].includes(p.value))throw Error('출석을 선택해주세요.');e.attendance[m]=p.value;if(p.value!=='참석'){e.entryIds=e.entryIds?.filter(x=>x!==m);for(const slot of Object.keys(e.best4||{}))if(e.best4![slot]===m)delete e.best4![slot];}break;}
  case 'event':{requireAdmin();const start=time(p.time),end=p.endTime?time(p.endTime):undefined;if(end&&end<=start)throw Error('종료 시간은 시작 시간 뒤여야 합니다.');if(p.id&&!s.events.some(e=>e.id===p.id))event(p.id);put('events',{id:id(),title:text(p.title,100),date:validDate(p.date),time:start,endTime:end,location:text(p.location,150),kind:text(p.kind,30),note:optional(p.note),opponent:optional(p.opponent,100),attendance:{}});break;}
@@ -43,5 +46,6 @@ export function mutate(state:TeamState,memberId:string,type:string,p:any):TeamSt
  case 'settings':requireCaptain();s.name=text(p.name,40);s.description=optional(p.description,150);if(p.monthlyFee!==null&&(!Number.isSafeInteger(p.monthlyFee)||p.monthlyFee<0||p.monthlyFee>1000000))throw Error('회비를 확인해주세요.');s.monthlyFee=p.monthlyFee;break;
  case 'delete':{requireAdmin();if(!['events','notices','transactions','matches','tasks','equipment','trainingSessions'].includes(p.collection))throw Error('삭제할 수 없습니다.');if(p.collection==='events'){const e=findEvent(s,p.id);if(e?.recurrenceId){const r=s.weeklyTraining?.find(r=>r.id===e.recurrenceId);if(r)r.exceptions=[...new Set([...(r.exceptions||[]),e.date])];}}if(p.collection==='trainingSessions'&&s.videos?.some(v=>v.sessionId===p.id))throw Error('영상을 먼저 삭제한 뒤 세션을 삭제해주세요.');const key=p.collection as 'events';s[key]=(s[key]||[]).filter((e:any)=>e.id!==p.id) as any;break;}
  default:throw Error('지원하지 않는 작업입니다.');}
+ if(type==='member')s.positionLeaders=cleanPositionLeaders(s.members,s.positionLeaders);
  if(JSON.stringify(s).length>750000)throw Error('팀 기록 용량을 초과했습니다. 오래된 기록을 내보내고 정리해주세요.');return s;
 }

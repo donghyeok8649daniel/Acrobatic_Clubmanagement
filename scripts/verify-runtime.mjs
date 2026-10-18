@@ -10,16 +10,23 @@ fs.mkdirSync(state,{recursive:true});
 const wrangler='node_modules/wrangler/bin/wrangler.js';
 const common=['--config','dist/server/wrangler.json','--local','--persist-to',state];
 const env={...process.env,WRANGLER_SEND_METRICS:'false',WRANGLER_WRITE_LOGS:'false',CLOUDFLARE_CF_FETCH_ENABLED:'false'};
-const schema=spawnSync(process.execPath,[wrangler,'d1','execute','DB',...common,'--file','drizzle/0000_solid_omega_sentinel.sql'],{stdio:'inherit',env});
-if(schema.status!==0)process.exit(schema.status||1);
-Object.assign(process.env,{WRANGLER_CI_DISABLE_CONFIG_WATCHING:'true'});
+for(const migration of fs.readdirSync('drizzle').filter(v=>v.endsWith('.sql')).sort()){
+ const schema=spawnSync(process.execPath,[wrangler,'d1','execute','DB',...common,'--file',path.join('drizzle',migration)],{stdio:'inherit',env});
+ if(schema.status!==0)process.exit(schema.status||1);
+}
 let worker;
 try{
-  // The API can disable file watching; the interactive CLI restarts on config
-  // or generated-file changes and can interrupt an otherwise valid mutation.
-  const {unstable_dev}=await import('wrangler');
-  worker=await unstable_dev('dist/server/index.js',{config:'dist/server/wrangler.json',ip:'127.0.0.1',port:0,inspectorPort:0,local:true,persistTo:state,logLevel:'error',experimental:{disableExperimentalWarning:true,disableDevRegistry:true,watch:false,testMode:true,liveReload:false}});
-  const origin=`http://${worker.address}:${worker.port}`;
+  // Exercise the built Worker directly, without the interactive dev proxy's
+  // reload/body forwarding layer, including simultaneous upload requests.
+  const {unstable_getMiniflareWorkerOptions}=await import('wrangler');
+  const {Miniflare}=await import('miniflare');
+  const config=unstable_getMiniflareWorkerOptions('dist/server/wrangler.json');
+  const serverRoot=path.dirname(config.main);
+  const moduleFiles=fs.readdirSync(serverRoot,{recursive:true}).filter(v=>/\.(m?js|wasm)$/.test(v)).map(v=>path.join(serverRoot,v));
+  const modules=[config.main,...moduleFiles.filter(v=>v!==config.main)].map(file=>({type:file.endsWith('.wasm')?'CompiledWasm':'ESModule',path:file}));
+  const runtime=new Miniflare({host:'127.0.0.1',port:0,cf:false,d1Persist:path.join(state,'v3','d1'),r2Persist:path.join(state,'v3','r2'),workers:[{...config.workerOptions,name:'acrobatic-integration',modules,modulesRoot:serverRoot},...config.externalWorkers]});
+  worker={stop:()=>runtime.dispose()};
+  const origin=(await runtime.ready).origin;
   let ready=false,stableReads=0;
   for(let i=0;i<60;i++){
     // Wrangler may expose the port before its initial worker reload completes.
@@ -35,8 +42,10 @@ try{
   const manifest=await fetch(origin+'/manifest.webmanifest');
   if(manifest.status!==200||(await manifest.json()).display!=='standalone')throw Error('Install manifest unavailable.');
   // Keep this event loop free to service the local runtime's bindings/proxy.
-  const result=await new Promise((resolve,reject)=>{const child=spawn(process.execPath,['scripts/verify-oct18.mjs'],{stdio:'inherit',env:{...env,ACRO_ORIGIN:origin}});child.once('error',reject);child.once('exit',code=>resolve(code));});
-  if(result!==0)process.exitCode=result||1;
+  for(const script of ['scripts/verify-oct18.mjs','scripts/verify-members.mjs']){
+   const result=await new Promise((resolve,reject)=>{const child=spawn(process.execPath,[script],{stdio:'inherit',env:{...env,ACRO_ORIGIN:origin}});child.once('error',reject);child.once('exit',code=>resolve(code));});
+   if(result!==0){process.exitCode=result||1;break;}
+  }
 }catch(error){console.error(error);process.exitCode=1;}
 finally{
   await worker?.stop();

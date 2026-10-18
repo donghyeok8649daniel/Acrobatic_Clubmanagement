@@ -13,7 +13,7 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "typecheck": "tsc --noEmit",
-    "test:unit": "node scripts/verify-pwa.mjs && node scripts/verify-positions.mjs",
+    "test:unit": "node scripts/verify-pwa.mjs && node scripts/verify-positions.mjs && node scripts/verify-members-unit.mjs",
     "test:integration": "node scripts/verify-runtime.mjs",
     "deploy:cloudflare": "node scripts/deploy-cloudflare.mjs"
   },
@@ -56,6 +56,7 @@
     "eslint": "9.39.4",
     "eslint-config-next": "16.3.4",
     "json-rpc-2.0": "1.7.1",
+    "miniflare": "^4.20260515.0",
     "raw-body": "3.0.2",
     "react-server-dom-webpack": "19.2.6",
     "tailwindcss": "4.2.1",

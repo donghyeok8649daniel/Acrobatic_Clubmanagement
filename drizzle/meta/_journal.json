@@ -8,6 +8,13 @@
       "when": 1792130090802,
       "tag": "0000_solid_omega_sentinel",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1792273040566,
+      "tag": "0001_cloudy_nocturne",
+      "breakpoints": true
     }
   ]
 }

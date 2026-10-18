@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {canLeadPosition,cleanPositionLeaders,memberLeadership} from '../lib/member-profile.ts';
+import {MAX_PROFILE_PHOTO_BYTES,validateProfilePhoto} from '../lib/profile-photo.ts';
+const player={id:'m1',name:'테스트',role:'player',position:'공격수',secondaryPosition:'세터',status:'활동 중'};
+assert.equal(canLeadPosition(player,'attack'),true);assert.equal(canLeadPosition(player,'setter'),true);assert.equal(canLeadPosition(player,'defense'),false);
+assert.equal(canLeadPosition({...player,position:'좌수비'},'defense'),true);
+assert.equal(canLeadPosition({...player,role:'manager'},'attack'),false);assert.equal(canLeadPosition({...player,status:'귀국'},'attack'),false);
+assert.deepEqual(cleanPositionLeaders([player],{attack:'m1',setter:'missing',defense:'m1'}),{attack:'m1'});
+assert.deepEqual(memberLeadership('m1',{attack:'m1'}),['공격수 팀장']);
+const bytes=fs.readFileSync(new URL('./fixtures/profile-photo.jpg',import.meta.url));
+assert.deepEqual(validateProfilePhoto(bytes),{width:64,height:64});
+assert.throws(()=>validateProfilePhoto(new Uint8Array(MAX_PROFILE_PHOTO_BYTES+1)));
+assert.throws(()=>validateProfilePhoto(Buffer.from('<svg onload="alert(1)"></svg>')));
+const broken=Buffer.from(bytes);broken[broken.length-1]=0;assert.throws(()=>validateProfilePhoto(broken));
+console.log('PASS: position-leader eligibility/cleanup and bounded JPEG photo validation');
