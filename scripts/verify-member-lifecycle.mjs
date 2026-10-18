@@ -1,15 +1,17 @@
 import assert from 'node:assert/strict';
+import {verifyMatchCancellation} from './verify-match-cancellation.mjs';
 const origin=process.env.ACRO_ORIGIN;
 assert.ok(origin,'ACRO_ORIGIN must point to a disposable local Worker');
 async function post(action,payload={},cookie=''){
- const response=await fetch(origin+'/api/team',{method:'POST',headers:{origin,'content-type':'application/json',...(cookie?{cookie}:{})},body:JSON.stringify({action,payload})});
+ const response=await fetch(origin+'/api/team',{method:'POST',headers:{origin,'content-type':'application/json',...(cookie?{cookie}:{})},body:JSON.stringify({action,payload}),signal:AbortSignal.timeout(20000)});
  return {status:response.status,data:await response.json(),cookie:response.headers.get('set-cookie')?.split(';')[0]};
 }
+console.log('Checking member and position-leader lifecycle');
 const created=await post('create',{name:'팀장 변경 검증',captain:'테스트 동장'});
 assert.equal(created.status,200);const captain=created.cookie;
 const assistant=await post('login',{teamId:created.data.teamId,code:created.data.codes.find(v=>v.memberId==='m3').code});
 assert.equal(assistant.status,200);
-async function state(){const response=await fetch(origin+'/api/team',{headers:{cookie:captain}});assert.equal(response.status,200);return (await response.json()).state;}
+async function state(){const response=await fetch(origin+'/api/team',{headers:{cookie:captain},signal:AbortSignal.timeout(20000)});assert.equal(response.status,200);return (await response.json()).state;}
 async function edit(id,patch){const member=(await state()).members.find(v=>v.id===id);const response=await post('member',{...member,...patch},captain);assert.equal(response.status,200,JSON.stringify(response.data));return response.data.state;}
 async function assign(group,member){const response=await post('positionLeader',{group,member},captain);assert.equal(response.status,200);return response.data.state;}
 await edit('m3',{position:'공격수',secondaryPosition:'세터'});
@@ -88,3 +90,5 @@ current=await edit('m4',{status:'활동 중'});
 assert.deepEqual(current.events.find(v=>v.id===fixtures[1]).entryIds,[]);
 assert.deepEqual(current.events.find(v=>v.id===fixtures[1]).best4,{});
 console.log('PASS: role/return changes clear future match rosters, BEST 4 and current lineup; past matches and attendance are preserved; reactivation never auto-selects players');
+const attendee=await post('login',{teamId:created.data.teamId,code:created.data.codes.find(v=>v.memberId==='m4').code});assert.equal(attendee.status,200);
+await verifyMatchCancellation({post,state,captain,manager:assistant.cookie,player:attendee.cookie});

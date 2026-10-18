@@ -42,7 +42,9 @@ export async function POST(req:Request){try{
  }
  for(let attempt=0;attempt<4;attempt++){
   const row=await readTeam(auth.team);if(!row)throw Error('팀이 없습니다.');const state=mutate(JSON.parse(row.state),auth.member,action,p);
-  const result=await db().prepare('UPDATE teams SET state=?, version=version+1 WHERE id=? AND version=?').bind(JSON.stringify(state),auth.team,row.version).run();
+  const serialized=JSON.stringify(state);
+  if(action==='eventCancellation'&&serialized===row.state)return json({state,teamId:auth.team,memberId:auth.member,version:row.version});
+  const result=await db().prepare('UPDATE teams SET state=?, version=version+1 WHERE id=? AND version=?').bind(serialized,auth.team,row.version).run();
   if(result.meta.changes)return json({state,teamId:auth.team,memberId:auth.member,version:row.version+1});
  }
  return json({error:'다른 팀원이 수정 중입니다. 다시 시도해주세요.'},409);

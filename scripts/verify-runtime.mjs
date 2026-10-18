@@ -1,5 +1,5 @@
 import './sites-env.mjs';
-import {spawn,spawnSync} from 'node:child_process';
+import {spawn} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import {setTimeout as delay} from 'node:timers/promises';
@@ -7,18 +7,13 @@ import {setTimeout as delay} from 'node:timers/promises';
 // A separate disposable D1/R2 state directory; never touches real team data.
 const state=path.resolve('.sites-runtime',`verify-${process.pid}`);
 fs.mkdirSync(state,{recursive:true});
-const wrangler='node_modules/wrangler/bin/wrangler.js';
-const common=['--config','dist/server/wrangler.json','--local','--persist-to',state];
 const env={...process.env,WRANGLER_SEND_METRICS:'false',WRANGLER_WRITE_LOGS:'false',CLOUDFLARE_CF_FETCH_ENABLED:'false'};
 const allScripts=['scripts/verify-oct18.mjs','scripts/verify-members.mjs','scripts/verify-member-lifecycle.mjs'];
 const selectedScripts=process.argv.slice(2);
 if(selectedScripts.some(script=>!allScripts.includes(script)))throw Error('Unknown integration test script.');
-for(const migration of fs.readdirSync('drizzle').filter(v=>v.endsWith('.sql')).sort()){
- const schema=spawnSync(process.execPath,[wrangler,'d1','execute','DB',...common,'--file',path.join('drizzle',migration)],{stdio:'inherit',env});
- if(schema.status!==0)process.exit(schema.status||1);
-}
 let worker;
 try{
+  console.log('Starting isolated local Worker');
   // Exercise the built Worker directly, without the interactive dev proxy's
   // reload/body forwarding layer, including simultaneous upload requests.
   const {unstable_getMiniflareWorkerOptions}=await import('wrangler');
@@ -30,11 +25,17 @@ try{
   const runtime=new Miniflare({host:'127.0.0.1',port:0,cf:false,d1Persist:path.join(state,'v3','d1'),r2Persist:path.join(state,'v3','r2'),workers:[{...config.workerOptions,name:'acrobatic-integration',modules,modulesRoot:serverRoot},...config.externalWorkers]});
   worker={stop:()=>runtime.dispose()};
   const origin=(await runtime.ready).origin;
+  console.log('Local Worker ready: '+origin);
+  // Initialize this disposable database through its own runtime binding. This
+  // avoids an extra Wrangler subprocess and its shutdown/network lifecycle.
+  const database=await runtime.getD1Database('DB','acrobatic-integration');
+  const schema=fs.readdirSync('drizzle').filter(file=>file.endsWith('.sql')).sort().flatMap(file=>fs.readFileSync(path.join('drizzle',file),'utf8').split('--> statement-breakpoint').map(sql=>sql.trim()).filter(Boolean));
+  await database.batch(schema.map(sql=>database.prepare(sql)));
   let ready=false,stableReads=0;
-  for(let i=0;i<60;i++){
+  for(let i=0;i<12;i++){
     // Wrangler may expose the port before its initial worker reload completes.
     // Probe only safe reads until the JSON API is stable; never retry mutations.
-    try{const r=await fetch(origin+'/api/team');const body=await r.json();stableReads=r.status===401&&typeof body.error==='string'?stableReads+1:0;if(stableReads>=4){ready=true;break;}}catch{stableReads=0;}
+    try{const r=await fetch(origin+'/api/team',{signal:AbortSignal.timeout(5000)});const body=await r.json();stableReads=r.status===401&&typeof body.error==='string'?stableReads+1:0;if(stableReads>=4){ready=true;break;}}catch{stableReads=0;}
     await delay(500);
   }
   if(!ready)throw Error('Local test Worker did not start.');

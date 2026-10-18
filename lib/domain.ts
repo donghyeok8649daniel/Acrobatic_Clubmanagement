@@ -1,7 +1,7 @@
 export type Role = 'captain' | 'manager' | 'assistant' | 'player';
 export type Member = {id:string;name:string;role:Role;number:number|null;position:string;secondaryPosition?:string;positionNote?:string;status:string;note?:string;departureMonth?:string;photoRevision?:string};
 export type PositionGroup='attack'|'setter'|'defense';
-export type Event = {id:string;title:string;date:string;time:string;endTime?:string;location:string;kind:string;note:string;attendance:Record<string,string>;recurrenceId?:string;opponent?:string;entryIds?:string[];best4?:Record<string,string>};
+export type Event = {id:string;title:string;date:string;time:string;endTime?:string;location:string;kind:string;note:string;attendance:Record<string,string>;recurrenceId?:string;opponent?:string;entryIds?:string[];best4?:Record<string,string>;cancelled?:boolean;cancellationVersion?:number};
 export type Notice = {id:string;title:string;body:string;pinned:boolean;date:string;author:string};
 export type Transaction = {id:string;title:string;amount:number;date:string;kind:string;member:string};
 export type Match = {id:string;opponent:string;date:string;our:number;their:number;note:string};

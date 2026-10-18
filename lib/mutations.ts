@@ -1,4 +1,4 @@
-import {TeamState,Member,Operations,WeeklyTraining,koreaDate} from './domain';
+import {TeamState,Member,Event,Operations,WeeklyTraining,koreaDate} from './domain';
 import {findEvent} from './training';
 import {canLeadPosition,cleanPositionLeaders,positionGroups} from './member-profile';
 import {isPlayingMember} from './positions';
@@ -6,6 +6,10 @@ const text=(v:any,max=500)=>{if(typeof v!=='string'||!v.trim()||v.length>max)thr
 const optional=(v:any,max=1000)=>typeof v==='string'?v.trim().slice(0,max):'';
 const validDate=(v:any)=>{const d=text(v,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(d)||!Number.isFinite(Date.parse(d))||new Date(d+'T12:00:00Z').toISOString().slice(0,10)!==d)throw Error('날짜를 확인해주세요.');return d;};
 const time=(v:any)=>{if(typeof v!=='string'||!/^\d\d:\d\d$/.test(v)||Number(v.slice(0,2))>23||Number(v.slice(3))>59)throw Error('시간을 확인해주세요.');return v;};
+function reconcileMatchSelection(event:Event,players:Set<string>){
+ if(event.entryIds)event.entryIds=event.entryIds.filter(id=>players.has(id)&&event.attendance[id]==='참석');
+ for(const slot of Object.keys(event.best4||{}))if(!event.entryIds?.includes(event.best4![slot]))delete event.best4![slot];
+}
 function weekly(value:any):WeeklyTraining[]{if(!Array.isArray(value)||value.length>7)throw Error('정기훈련은 최대 7개까지 등록할 수 있습니다.');return value.map(r=>{const start=time(r.time),end=time(r.endTime);if(end<=start)throw Error('종료 시간은 시작 시간 뒤여야 합니다.');if(!Number.isInteger(r.weekday)||r.weekday<0||r.weekday>6)throw Error('요일을 확인해주세요.');const id=text(r.id,80);if(!/^[\w-]+$/.test(id))throw Error('정기훈련 ID를 확인해주세요.');return {id,weekday:r.weekday,time:start,endTime:end,location:text(r.location,150),startDate:validDate(r.startDate),note:optional(r.note),enabled:r.enabled!==false,exceptions:Array.isArray(r.exceptions)?r.exceptions.map(validDate).slice(0,500):[]};});}
 export function validateSetup(p:any,current:TeamState,memberId:string):TeamState{
  if(!Array.isArray(p.members)||p.members.length<1||p.members.length>100)throw Error('명단은 1~100명까지 등록할 수 있습니다.');
@@ -25,13 +29,22 @@ export function mutate(state:TeamState,memberId:string,type:string,p:any):TeamSt
  let s=structuredClone(state);const me=s.members.find(m=>m.id===memberId);if(!me)throw Error('팀원을 찾을 수 없습니다.');const admin=me.role!=='player',captain=me.role==='captain';
  const requireAdmin=()=>{if(!admin)throw Error('관리 담당자만 수정할 수 있습니다.');};const requireCaptain=()=>{if(!captain)throw Error('동장만 수정할 수 있습니다.');};const id=()=>crypto.randomUUID();
  const member=(v:any,empty=false)=>{if(empty&&!v)return '';if(!s.members.some(m=>m.id===v))throw Error('담당자를 선택해주세요.');return v;};
- const event=(eid:string)=>{const e=findEvent(s,eid);if(!e)throw Error('일정이 없습니다.');if(!s.events.some(v=>v.id===eid))s.events.push(e);return s.events.find(v=>v.id===eid)!;};
+ const event=(eid:string,includeCancelled=false)=>{const e=findEvent(s,eid);if(!e)throw Error('일정이 없습니다.');if(e.cancelled&&!includeCancelled)throw Error('취소된 경기의 출석과 엔트리는 변경할 수 없습니다.');if(!s.events.some(v=>v.id===eid))s.events.push(e);return s.events.find(v=>v.id===eid)!;};
  const put=(key:'events'|'notices'|'transactions'|'matches'|'tasks'|'equipment'|'trainingSessions',item:any)=>{if(key==='trainingSessions')s.trainingSessions??=[];const list=s[key] as any[];if(p.id){const i=list.findIndex(v=>v.id===p.id);if(i<0)throw Error('수정할 기록이 없습니다.');const old=list[i];list[i]={...old,...item,id:p.id,...(key==='events'?{attendance:old.attendance}:{}),...(key==='tasks'?{done:old.done}:{})};}else if(['notices','matches','tasks','trainingSessions'].includes(key))list.unshift(item);else list.push(item);};
  switch(type){
  case 'positionLeader':{requireCaptain();const group=positionGroups.find(v=>v.id===p.group);if(!group)throw Error('포지션을 확인해주세요.');s.positionLeaders??={};if(!p.member){delete s.positionLeaders[group.id];break;}const leader=s.members.find(v=>v.id===p.member);if(!leader||!canLeadPosition(leader,group.id))throw Error('해당 주·세컨 포지션을 가진 선수를 선택해주세요.');s.positionLeaders[group.id]=leader.id;break;}
  case 'setup':requireCaptain();s=validateSetup(p,s,memberId);break;
  case 'attendance':{const e=event(p.event),m=member(p.member||memberId);if(!admin&&m!==memberId)throw Error('본인의 출석만 변경할 수 있습니다.');if(!['참석','불참','미정'].includes(p.value))throw Error('출석을 선택해주세요.');e.attendance[m]=p.value;if(p.value!=='참석'){e.entryIds=e.entryIds?.filter(x=>x!==m);for(const slot of Object.keys(e.best4||{}))if(e.best4![slot]===m)delete e.best4![slot];}break;}
- case 'event':{requireAdmin();const start=time(p.time),end=p.endTime?time(p.endTime):undefined;if(end&&end<=start)throw Error('종료 시간은 시작 시간 뒤여야 합니다.');if(p.id&&!s.events.some(e=>e.id===p.id))event(p.id);put('events',{id:id(),title:text(p.title,100),date:validDate(p.date),time:start,endTime:end,location:text(p.location,150),kind:text(p.kind,30),note:optional(p.note),opponent:optional(p.opponent,100),attendance:{}});break;}
+ case 'event':{requireAdmin();const start=time(p.time),end=p.endTime?time(p.endTime):undefined;if(end&&end<=start)throw Error('종료 시간은 시작 시간 뒤여야 합니다.');if(p.id){const old=event(p.id,true);if(old.cancelled&&!['친선 경기','대회'].includes(p.kind))throw Error('취소된 경기는 복원한 뒤 일정 유형을 변경해주세요.');}put('events',{id:id(),title:text(p.title,100),date:validDate(p.date),time:start,endTime:end,location:text(p.location,150),kind:text(p.kind,30),note:optional(p.note),opponent:optional(p.opponent,100),attendance:{}});break;}
+ case 'eventCancellation':{
+  requireAdmin();const e=event(p.event,true);
+  if(!['친선 경기','대회'].includes(e.kind)||e.date<koreaDate())throw Error('예정 경기만 취소하거나 복원할 수 있습니다.');
+  if(typeof p.cancelled!=='boolean'||!Number.isSafeInteger(p.expectedVersion)||p.expectedVersion<0)throw Error('경기 상태를 확인해주세요.');
+  if(!!e.cancelled===p.cancelled)break;
+  if((e.cancellationVersion||0)!==p.expectedVersion)throw Error('다른 팀원이 경기 상태를 변경했어요. 새로고침 후 다시 시도해주세요.');
+  if(!p.cancelled)reconcileMatchSelection(e,new Set(s.members.filter(isPlayingMember).map(member=>member.id)));
+  e.cancelled=p.cancelled;e.cancellationVersion=(e.cancellationVersion||0)+1;break;
+ }
  case 'weeklyTraining':requireCaptain();s.weeklyTraining=weekly(p.rules);break;
  case 'matchEntry':{requireAdmin();const e=event(p.event);if(!['친선 경기','대회'].includes(e.kind))throw Error('경기 일정에서만 엔트리를 편집할 수 있습니다.');const m=member(p.member),entry=new Set(e.entryIds||[]);if(entry.has(m)){entry.delete(m);for(const slot of Object.keys(e.best4||{}))if(e.best4![slot]===m)delete e.best4![slot];}else{if(!isPlayingMember(s.members.find(v=>v.id===m))||e.attendance[m]!=='참석')throw Error('참석하는 선수만 엔트리에 넣을 수 있습니다.');entry.add(m);}e.entryIds=[...entry];break;}
  case 'matchBest4':{requireAdmin();const e=event(p.event);if(!['친선 경기','대회'].includes(e.kind)||!['attack','setter','left','right'].includes(p.slot))throw Error('경기 포지션을 확인해주세요.');if(p.member&&(!isPlayingMember(s.members.find(v=>v.id===p.member))||!e.entryIds?.includes(p.member)||e.attendance[p.member]!=='참석'))throw Error('참석 엔트리에 있는 선수를 선택해주세요.');e.best4??={};for(const slot of Object.keys(e.best4))if(e.best4[slot]===p.member)delete e.best4[slot];if(p.member)e.best4[p.slot]=p.member;else delete e.best4[p.slot];break;}
@@ -45,7 +58,7 @@ export function mutate(state:TeamState,memberId:string,type:string,p:any):TeamSt
  case 'trainingSession':requireAdmin();if(p.eventId&&!findEvent(s,p.eventId))throw Error('연결할 일정이 없습니다.');put('trainingSessions',{id:id(),title:text(p.title,100),date:validDate(p.date),goal:optional(p.goal,1000),drills:optional(p.drills,3000),feedback:optional(p.feedback,3000),author:memberId,...(p.eventId?{eventId:p.eventId}:{})});break;
  case 'lineup':requireAdmin();if(!['attack','setter','left','right'].includes(p.slot))throw Error('포지션을 확인해주세요.');if(p.member&&!isPlayingMember(s.members.find(m=>m.id===p.member)))throw Error('선수를 선택해주세요.');if(p.member)member(p.member);for(const slot of Object.keys(s.lineup))if(s.lineup[slot]===p.member)delete s.lineup[slot];s.lineup[p.slot]=p.member;break;
  case 'settings':requireCaptain();s.name=text(p.name,40);s.description=optional(p.description,150);if(p.monthlyFee!==null&&(!Number.isSafeInteger(p.monthlyFee)||p.monthlyFee<0||p.monthlyFee>1000000))throw Error('회비를 확인해주세요.');s.monthlyFee=p.monthlyFee;break;
- case 'delete':{requireAdmin();if(!['events','notices','transactions','matches','tasks','equipment','trainingSessions'].includes(p.collection))throw Error('삭제할 수 없습니다.');if(p.collection==='events'){const e=findEvent(s,p.id);if(e?.recurrenceId){const r=s.weeklyTraining?.find(r=>r.id===e.recurrenceId);if(r)r.exceptions=[...new Set([...(r.exceptions||[]),e.date])];}}if(p.collection==='trainingSessions'&&s.videos?.some(v=>v.sessionId===p.id))throw Error('영상을 먼저 삭제한 뒤 세션을 삭제해주세요.');const key=p.collection as 'events';s[key]=(s[key]||[]).filter((e:any)=>e.id!==p.id) as any;break;}
+ case 'delete':{requireAdmin();if(!['events','notices','transactions','matches','tasks','equipment','trainingSessions'].includes(p.collection))throw Error('삭제할 수 없습니다.');if(p.collection==='events'){const e=findEvent(s,p.id);if(e&&['친선 경기','대회'].includes(e.kind)&&e.date>=koreaDate())throw Error('예정 경기는 삭제 대신 경기 취소를 사용해주세요.');if(e?.recurrenceId){const r=s.weeklyTraining?.find(r=>r.id===e.recurrenceId);if(r)r.exceptions=[...new Set([...(r.exceptions||[]),e.date])];}}if(p.collection==='trainingSessions'&&s.videos?.some(v=>v.sessionId===p.id))throw Error('영상을 먼저 삭제한 뒤 세션을 삭제해주세요.');const key=p.collection as 'events';s[key]=(s[key]||[]).filter((e:any)=>e.id!==p.id) as any;break;}
  default:throw Error('지원하지 않는 작업입니다.');}
  if(type==='member'||type==='setup'){
   s.positionLeaders=cleanPositionLeaders(s.members,s.positionLeaders);
@@ -55,8 +68,7 @@ export function mutate(state:TeamState,memberId:string,type:string,p:any):TeamSt
    // Past match selections are historical records. Only current/upcoming
    // matches follow today's playing eligibility; attendance is kept intact.
    if(event.date<today||!['친선 경기','대회'].includes(event.kind))continue;
-   if(event.entryIds)event.entryIds=event.entryIds.filter(id=>players.has(id)&&event.attendance[id]==='참석');
-   for(const slot of Object.keys(event.best4||{}))if(!event.entryIds?.includes(event.best4![slot]))delete event.best4![slot];
+   reconcileMatchSelection(event,players);
   }
  }
  if(JSON.stringify(s).length>750000)throw Error('팀 기록 용량을 초과했습니다. 오래된 기록을 내보내고 정리해주세요.');return s;

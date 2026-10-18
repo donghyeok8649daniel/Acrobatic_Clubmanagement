@@ -560,6 +560,20 @@ MP4, WebM, MOV 형식만 지원합니다.|Only MP4, WebM and MOV formats are sup
 프로필 사진은 128KB까지 저장할 수 있습니다.|Stored profile photos must be no larger than 128KB.
 본인 사진만 변경할 수 있습니다.|You can change only your own photo.
 JPEG 사진으로 변환해서 올려주세요.|Convert the photo to JPEG before uploading.
+취소된 경기|Cancelled matches
+취소됨|Cancelled
+경기 취소|Cancel match
+경기 복원|Restore match
+경기를 취소할까요?|Cancel this match?
+취소 확인|Confirm cancellation
+취소해도 출석·엔트리·BEST 4는 보관됩니다.|Attendance, the roster and BEST 4 are preserved when cancelled.
+취소된 경기는 참가 조사가 잠깁니다. 복원하면 다시 진행할 수 있어요.|Availability is locked while cancelled. Restore the match to reopen it.
+취소된 경기의 출석과 엔트리는 변경할 수 없습니다.|Attendance and the roster cannot be changed while a match is cancelled.
+예정 경기만 취소하거나 복원할 수 있습니다.|Only upcoming matches can be cancelled or restored.
+경기 상태를 확인해주세요.|Check the match status.
+다른 팀원이 경기 상태를 변경했어요. 새로고침 후 다시 시도해주세요.|Another member changed this match's status. Refresh and try again.
+취소된 경기는 복원한 뒤 일정 유형을 변경해주세요.|Restore this cancelled match before changing it to another event type.
+예정 경기는 삭제 대신 경기 취소를 사용해주세요.|Use Cancel match instead of deleting an upcoming match.
 `;
 export const english:Readonly<Record<string,string>>=Object.fromEntries(entries.trim().split('\n').map(row=>{const index=row.indexOf('|');return [row.slice(0,index),row.slice(index+1)];}));
 
