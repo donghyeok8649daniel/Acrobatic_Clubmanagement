@@ -1,4 +1,5 @@
 'use client';
+import {useLanguage} from '../lib/i18n';
 import {useEffect,useRef,useState} from 'react';
 import {Camera,ShieldCheck,Trash2} from 'lucide-react';
 import type {Member,TeamState} from '../lib/domain';
@@ -6,9 +7,9 @@ import {canLeadPosition,positionGroups} from '../lib/member-profile';
 import {positionLabel,positionRank} from '../lib/positions';
 import {MAX_PROFILE_PHOTO_BYTES} from '../lib/profile-photo';
 
-export function Avatar({member,size=''}:{member:Member;size?:string}){
+export function Avatar({member,size=''}:{member:Member;size?:string}){const {t:tr}=useLanguage();
  const [failed,fail]=useState(false);useEffect(()=>fail(false),[member.id,member.photoRevision]);
- return <span className={'avatar '+size+' color-'+(Number(member.id.slice(1))%6)}>{member.photoRevision&&!failed?<img src={'/api/members/'+encodeURIComponent(member.id)+'/photo?v='+encodeURIComponent(member.photoRevision)} alt={member.name+' 프로필 사진'} loading="lazy" onError={()=>fail(true)}/>:member.name.slice(-2)}</span>;
+ return <span className={'avatar '+size+' color-'+(Number(member.id.slice(1))%6)}>{tr(member.photoRevision&&!failed?<img src={'/api/members/'+encodeURIComponent(member.id)+'/photo?v='+encodeURIComponent(member.photoRevision)} alt={tr(member.name+' 프로필 사진')} loading="lazy" onError={()=>fail(true)}/>:member.name.slice(-2))}</span>;
 }
 async function preparePhoto(file:File){
  if(!file.type.startsWith('image/')||file.size===0||file.size>15*1024*1024)throw Error('15MB 이하의 사진 파일을 선택해주세요.');
@@ -26,7 +27,7 @@ async function preparePhoto(file:File){
   throw Error('사진 용량을 줄이지 못했습니다. 다른 사진을 선택해주세요.');
  }finally{URL.revokeObjectURL(url);}
 }
-export function ProfilePhotoEditor({member,canEdit,demo,onRefresh,onNotify}:{member:Member;canEdit:boolean;demo:boolean;onRefresh:()=>Promise<void>;onNotify:(message:string)=>void}){
+export function ProfilePhotoEditor({member,canEdit,demo,onRefresh,onNotify}:{member:Member;canEdit:boolean;demo:boolean;onRefresh:()=>Promise<void>;onNotify:(message:string)=>void}){const {t:tr}=useLanguage();
  const input=useRef<HTMLInputElement>(null);const [busy,B]=useState(false),[error,E]=useState(''),[confirm,C]=useState(false);
  async function request(file?:File){E('');B(true);try{
   const blob=file?await preparePhoto(file):undefined;
@@ -35,11 +36,11 @@ export function ProfilePhotoEditor({member,canEdit,demo,onRefresh,onNotify}:{mem
   await onRefresh();C(false);onNotify(file?'프로필 사진을 등록했어요.':'프로필 사진을 삭제했어요.');
  }catch(error){E((error as Error).message);}finally{B(false);}}
  if(!canEdit)return null;
- return <section className="profile-photo-editor"><input ref={input} type="file" accept="image/*" aria-label="프로필 사진 파일" hidden disabled={busy||demo} onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(file)void request(file);}}/><div className="photo-actions"><button className="btn secondary small" disabled={busy||demo} onClick={()=>input.current?.click()}><Camera size={15}/>{busy?'사진 저장 중…':member.photoRevision?'사진 변경':'사진 등록'}</button>{member.photoRevision&&<button className="text-btn danger" disabled={busy||demo} onClick={()=>C(true)}><Trash2 size={14}/>사진 삭제</button>}</div><p className="hint">{demo?'사진 등록은 실제 팀 로그인 후 사용할 수 있어요.':'사진 중앙을 정사각형으로 잘라 저장해요. 팀원에게 함께 표시됩니다.'}</p>{confirm&&<div className="photo-remove-confirm"><span>프로필 사진을 삭제할까요?</span><button className="text-btn" onClick={()=>C(false)} disabled={busy}>취소</button><button className="text-btn danger" onClick={()=>void request()} disabled={busy}>삭제</button></div>}{error&&<p className="modal-alert" role="alert">{error}</p>}</section>;
+ return <section className="profile-photo-editor"><input ref={input} type="file" accept="image/*" aria-label={tr("프로필 사진 파일")} hidden disabled={busy||demo} onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(file)void request(file);}}/><div className="photo-actions"><button className="btn secondary small" disabled={busy||demo} onClick={()=>input.current?.click()}><Camera size={15}/>{tr(busy?'사진 저장 중…':member.photoRevision?'사진 변경':'사진 등록')}</button>{member.photoRevision&&<button className="text-btn danger" disabled={busy||demo} onClick={()=>C(true)}><Trash2 size={14}/>{tr("사진 삭제")}</button>}</div><p className="hint">{tr(demo?'사진 등록은 실제 팀 로그인 후 사용할 수 있어요.':'사진 중앙을 정사각형으로 잘라 저장해요. 팀원에게 함께 표시됩니다.')}</p>{confirm&&<div className="photo-remove-confirm"><span>{tr("프로필 사진을 삭제할까요?")}</span><button className="text-btn" onClick={()=>C(false)} disabled={busy}>{tr("취소")}</button><button className="text-btn danger" onClick={()=>void request()} disabled={busy}>{tr("삭제")}</button></div>}{error&&<p className="modal-alert" role="alert">{tr(error)}</p>}</section>;
 }
-export function PositionLeaders({state,canEdit,busy,onSave}:{state:TeamState;canEdit:boolean;busy:boolean;onSave:(type:string,payload:any,close?:boolean)=>void}){
- return <section className="panel position-leaders"><div className="section-title"><div><h2>포지션별 팀장</h2><p>{canEdit?'주·세컨 포지션에 해당하는 선수를 지정하세요.':'공격수 · 세터 · 수비 파트의 팀장을 확인해요.'}</p></div><ShieldCheck size={21}/></div><div className="position-leader-grid">{positionGroups.map(group=>{
+export function PositionLeaders({state,canEdit,busy,onSave}:{state:TeamState;canEdit:boolean;busy:boolean;onSave:(type:string,payload:any,close?:boolean)=>void}){const {t:tr}=useLanguage();
+ return <section className="panel position-leaders"><div className="section-title"><div><h2>{tr("포지션별 팀장")}</h2><p>{tr(canEdit?'주·세컨 포지션에 해당하는 선수를 지정하세요.':'공격수 · 세터 · 수비 파트의 팀장을 확인해요.')}</p></div><ShieldCheck size={21}/></div><div className="position-leader-grid">{positionGroups.map(group=>{
   const current=state.members.find(v=>v.id===state.positionLeaders?.[group.id]);const candidates=state.members.filter(v=>canLeadPosition(v,group.id)).sort((a,b)=>positionRank(a,group.id)-positionRank(b,group.id)||a.name.localeCompare(b.name,'ko'));
-  return <div className="position-leader-card" key={group.id}><span className="leader-position">{group.name} 팀장</span>{current?<div className="position-leader-person"><Avatar member={current}/><div><strong>{current.name}</strong><small>{positionLabel(current)}</small></div></div>:<div className="leader-unassigned">미정</div>}{canEdit&&<label className="leader-select"><span className="sr-only">{group.name} 팀장 지정</span><select aria-label={group.name+' 팀장 지정'} disabled={busy} value={current?.id||''} onChange={e=>onSave('positionLeader',{group:group.id,member:e.target.value},false)}><option value="">미정 · 지정 해제</option>{candidates.map(v=><option key={v.id} value={v.id}>{v.name} · {positionLabel(v)}</option>)}</select></label>}</div>;
- })}</div>{canEdit&&<p className="hint">팀장은 동장만 지정할 수 있어요. 관리 담당자 권한과는 별도로 표시됩니다.</p>}</section>;
+  return <div className="position-leader-card" key={group.id}><span className="leader-position">{tr(group.name)} {tr(" 팀장")}</span>{current?<div className="position-leader-person"><Avatar member={current}/><div><strong>{current.name}</strong><small>{tr(positionLabel(current))}</small></div></div>:<div className="leader-unassigned">{tr("미정")}</div>}{canEdit&&<label className="leader-select"><span className="sr-only">{tr(group.name)} {tr(" 팀장 지정")}</span><select aria-label={tr(group.name+' 팀장 지정')} disabled={busy} value={current?.id||''} onChange={e=>onSave('positionLeader',{group:group.id,member:e.target.value},false)}><option value="">{tr("미정 · 지정 해제")}</option>{candidates.map(v=><option key={v.id} value={v.id}>{v.name} · {tr(positionLabel(v))}</option>)}</select></label>}</div>;
+ })}</div>{canEdit&&<p className="hint">{tr("팀장은 동장만 지정할 수 있어요. 관리 담당자 권한과는 별도로 표시됩니다.")}</p>}</section>;
 }
