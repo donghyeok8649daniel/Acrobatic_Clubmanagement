@@ -3,12 +3,13 @@ import {spawn} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import {setTimeout as delay} from 'node:timers/promises';
+import {initialState} from '../lib/domain.ts';
 
 // A separate disposable D1/R2 state directory; never touches real team data.
 const state=path.resolve('.sites-runtime',`verify-${process.pid}`);
 fs.mkdirSync(state,{recursive:true});
 const env={...process.env,WRANGLER_SEND_METRICS:'false',WRANGLER_WRITE_LOGS:'false',CLOUDFLARE_CF_FETCH_ENABLED:'false'};
-const allScripts=['scripts/verify-oct18.mjs','scripts/verify-members.mjs','scripts/verify-member-lifecycle.mjs'];
+const allScripts=['scripts/verify-oct18.mjs','scripts/verify-members.mjs','scripts/verify-member-lifecycle.mjs','scripts/verify-login-alias-api.mjs'];
 const selectedScripts=process.argv.slice(2);
 if(selectedScripts.some(script=>!allScripts.includes(script)))throw Error('Unknown integration test script.');
 let worker;
@@ -22,7 +23,8 @@ try{
   const serverRoot=path.dirname(config.main);
   const moduleFiles=fs.readdirSync(serverRoot,{recursive:true}).filter(v=>/\.(m?js|wasm)$/.test(v)).map(v=>path.join(serverRoot,v));
   const modules=[config.main,...moduleFiles.filter(v=>v!==config.main)].map(file=>({type:file.endsWith('.wasm')?'CompiledWasm':'ESModule',path:file}));
-  const runtime=new Miniflare({host:'127.0.0.1',port:0,cf:false,d1Persist:path.join(state,'v3','d1'),r2Persist:path.join(state,'v3','r2'),workers:[{...config.workerOptions,name:'acrobatic-integration',modules,modulesRoot:serverRoot},...config.externalWorkers]});
+  const bindings={...config.workerOptions.bindings,TEAM_LOGIN_ALIASES:JSON.stringify({'ADMIN-EXAMPLE':{teamId:'ACRO-ALIAS-TEST',memberId:'m1'}})};
+  const runtime=new Miniflare({host:'127.0.0.1',port:0,cf:false,d1Persist:path.join(state,'v3','d1'),r2Persist:path.join(state,'v3','r2'),workers:[{...config.workerOptions,name:'acrobatic-integration',bindings,modules,modulesRoot:serverRoot},...config.externalWorkers]});
   worker={stop:()=>runtime.dispose()};
   const origin=(await runtime.ready).origin;
   console.log('Local Worker ready: '+origin);
@@ -31,6 +33,12 @@ try{
   const database=await runtime.getD1Database('DB','acrobatic-integration');
   const schema=fs.readdirSync('drizzle').filter(file=>file.endsWith('.sql')).sort().flatMap(file=>fs.readFileSync(path.join('drizzle',file),'utf8').split('--> statement-breakpoint').map(sql=>sql.trim()).filter(Boolean));
   await database.batch(schema.map(sql=>database.prepare(sql)));
+  const aliasTeam='ACRO-ALIAS-TEST';
+  await database.prepare('INSERT INTO teams(id,state,version) VALUES (?,?,0)').bind(aliasTeam,JSON.stringify(initialState('Alias test','Captain'))).run();
+  for(const [member,code] of [['m1','TESTALIASCAPTAIN'],['m4','TESTALIASPLAYER']]){
+   const hash=Buffer.from(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(aliasTeam+':'+code))).toString('hex');
+   await database.prepare('INSERT INTO credentials(id,team,member,hash) VALUES (?,?,?,?)').bind('alias-'+member,aliasTeam,member,hash).run();
+  }
   let ready=false,stableReads=0;
   for(let i=0;i<12;i++){
     // Wrangler may expose the port before its initial worker reload completes.

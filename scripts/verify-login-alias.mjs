@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {resolveLoginIdentifier} from '../lib/login-alias.ts';
+const config=JSON.stringify({'ADMIN-EXAMPLE':{teamId:'ACRO-EXAMPLE',memberId:'m1'}});
+assert.deepEqual(resolveLoginIdentifier(' admin-example ',config),{teamId:'ACRO-EXAMPLE',memberId:'m1'});
+assert.deepEqual(resolveLoginIdentifier('acro-other',config),{teamId:'ACRO-OTHER'});
+assert.deepEqual(resolveLoginIdentifier('toString',config),{teamId:'TOSTRING'});
+assert.deepEqual(resolveLoginIdentifier('admin-example','invalid json'),{teamId:'ADMIN-EXAMPLE'});
+assert.deepEqual(resolveLoginIdentifier('admin-example',JSON.stringify({'ADMIN-EXAMPLE':{teamId:'ACRO-EXAMPLE'}})),{teamId:'ADMIN-EXAMPLE'});
+assert.deepEqual(resolveLoginIdentifier('admin-example',JSON.stringify({'ADMIN-EXAMPLE':{teamId:'ACRO-EXAMPLE',memberId:'../m1'}})),{teamId:'ADMIN-EXAMPLE'});
+console.log('PASS: case-insensitive private login aliases, member restrictions, canonical fallback and invalid configuration handling');

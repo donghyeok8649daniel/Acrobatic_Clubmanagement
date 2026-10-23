@@ -241,6 +241,8 @@ CSV 내보내기|Export CSV
 로 입장하세요.| to sign in.
 다른 기기에서도 같은 팀의 기록을 함께 볼 수 있어요.|View the same team records on any device.
 팀 ID|Team ID
+팀 ID / 관리자 ID|Team ID / admin ID
+팀 ID 또는 관리자 ID|Team ID or admin ID
 동장에게 받은 개인 코드|Your code from the captain
 팀에 입장하기|Sign in to team
 아직 팀이 없나요? 우리 팀 만들기|No team yet? Create your team

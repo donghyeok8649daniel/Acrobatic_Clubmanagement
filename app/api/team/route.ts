@@ -1,6 +1,7 @@
 import {env} from 'cloudflare:workers';
 import {initialState,TeamState} from '../../../lib/domain';
 import {mutate} from '../../../lib/mutations';
+import {resolveLoginIdentifier} from '../../../lib/login-alias';
 export const dynamic='force-dynamic';
 const db=()=>{if(!env.DB)throw Error('데이터베이스가 연결되지 않았습니다.');return env.DB;};
 const digest=async(s:string)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))).map(b=>b.toString(16).padStart(2,'0')).join('');
@@ -25,10 +26,11 @@ export async function POST(req:Request){try{
   return json({state,teamId,memberId:'m1',codes,version:0},200,{'Set-Cookie':await createSession(req,teamId,'m1')});
  }
  if(action==='login'){
-  await limited(req,'login',20,900000);const teamId=String(p.teamId||'').trim().toUpperCase();const code=String(p.code||'').replace(/[\s-]/g,'').toUpperCase();
-  if(teamId.length>60||code.length>80)throw Error('팀 ID와 입장코드를 확인해주세요.');
+  await limited(req,'login',20,900000);const identifier=String(p.teamId||'').trim();const code=String(p.code||'').replace(/[\s-]/g,'').toUpperCase();
+  if(identifier.length>60||code.length>80)throw Error('팀 ID와 입장코드를 확인해주세요.');
+  const target=resolveLoginIdentifier(identifier,env.TEAM_LOGIN_ALIASES),teamId=target.teamId;
   const credential=await db().prepare('SELECT member FROM credentials WHERE team=? AND hash=?').bind(teamId,await digest(teamId+':'+code)).first<{member:string}>();
-  if(!credential)return json({error:'팀 ID 또는 개인 입장코드가 올바르지 않습니다.'},401);
+  if(!credential||(target.memberId&&target.memberId!==credential.member))return json({error:'팀 ID 또는 개인 입장코드가 올바르지 않습니다.'},401);
   const row=await readTeam(teamId);if(!row)throw Error('팀을 찾을 수 없습니다.');
   return json({state:JSON.parse(row.state),teamId,memberId:credential.member,version:row.version},200,{'Set-Cookie':await createSession(req,teamId,credential.member)});
  }
